@@ -155,7 +155,7 @@
   }
   function initial(p) { return ((p.given || p.surname || "?").trim().charAt(0) || "?").toUpperCase(); }
   const shortPlace = (s) => (s || "").split(",")[0].trim();
-  const shortJob = (s) => (s || "").split(",")[0].replace(/\s*\(.*?\)/g, "").trim();
+  const shortJob = (s) => (s || "").replace(/\s*\(.*?\)/g, "").split(",")[0].trim();
 
   const ICONS = {
     pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
@@ -368,7 +368,9 @@
     drawMinimap();
     applyHighlight();
     updateCollapseChip();
+    listeners.forEach((fn) => { try { fn(); } catch (e) { /* une extension ne doit jamais casser l'arbre */ } });
   }
+  const listeners = [];
 
   // --- replier / déplier une branche
   function toggleBranch(t) {
@@ -669,6 +671,11 @@
     return geocode(p.birthPlace);
   }
 
+  function resolvePlace(place) {
+    if (typeof PLACES !== "undefined" && PLACES[place]) return Promise.resolve({ lat: +PLACES[place][0], lon: +PLACES[place][1] });
+    return geocode(place);
+  }
+
   function clearMap() {
     mapToken++;
     if (currentMap) { try { currentMap.remove(); } catch (e) { /* déjà retirée */ } currentMap = null; }
@@ -891,6 +898,7 @@
   $("lightbox").addEventListener("click", (e) => { if (e.target === $("lightbox")) $("lightbox").close(); });
 
   function showPerson(id) {
+    if (window.Extras && Extras.tab() !== "tree") Extras.showTab("tree");
     if (!cardEls(id).length && hasCollapse()) expandAll(false);      // la personne était dans une branche repliée
     if (!cardEls(id).length) setView({ mode: "all", pid: null });
     openPanel(id);
@@ -1150,6 +1158,10 @@
     setState, resetDraft, refresh: render,
     hasDraft: () => dirty,
     showPerson, setView, openPanel, closePanel,
+    onChange: (fn) => listeners.push(fn),
+    loadLeaflet, resolvePlace, placeCoords, redrawMinimap: () => { if (layout) drawMinimap(); },
+    isLiving, allGenerations: () => TreeLayout.layoutView(idx, { mode: "all" }).gens,
+    searchFor: (text) => { if (window.Extras) Extras.showTab("tree"); searchInput.value = text; runSearch(); searchInput.focus(); },
     displayName, cardDates, isUnknown, isDead, yearOf, parseDate, formatDate, shortDate, MONTHS,
   };
 

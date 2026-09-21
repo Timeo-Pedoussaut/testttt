@@ -44,7 +44,13 @@
   </div>
 </header>
 
-<div class="toolbar" role="toolbar" aria-label="Affichage de l'arbre">
+<nav class="tabs" role="tablist" aria-label="Sections du site">
+  <button type="button" role="tab" id="tab-tree" data-tab="tree" aria-selected="true" aria-controls="section-tree">Arbre</button>
+  <button type="button" role="tab" id="tab-map" data-tab="map" aria-selected="false" aria-controls="page-map">Carte de la famille</button>
+  <button type="button" role="tab" id="tab-stats" data-tab="stats" aria-selected="false" aria-controls="page-stats">Statistiques</button>
+</nav>
+
+<div class="toolbar tree-only" role="toolbar" aria-label="Affichage de l'arbre">
   <div class="tb-view">
     <label><span class="sr">Type de vue</span>
       <select id="view-mode">
@@ -75,12 +81,12 @@
   </div>
 </div>
 
-<div id="collapse-chip" class="banner banner-info" hidden>
+<div id="collapse-chip" class="banner banner-info tree-only" hidden>
   <p id="collapse-chip-text"></p>
   <div class="banner-actions"><button type="button" id="collapse-clear" class="btn">Tout déplier</button></div>
 </div>
 
-<div id="search-chip" class="banner banner-info" hidden>
+<div id="search-chip" class="banner banner-info tree-only" hidden>
   <p id="search-chip-text"></p>
   <div class="banner-actions"><button type="button" id="search-clear" class="btn">Effacer la recherche</button></div>
 </div>
@@ -98,7 +104,7 @@
   <span id="print-sub"></span>
 </div>
 
-<div class="viewport-wrap">
+<div class="viewport-wrap tree-only" id="section-tree">
   <main id="viewport" class="viewport" tabindex="-1" aria-label="Arbre généalogique">
     <div id="stage" class="stage">
       <div id="canvas" class="canvas">
@@ -112,6 +118,32 @@
     <div id="mm-view" class="mm-view"></div>
   </div>
 </div>
+
+<section id="page-map" class="page" role="tabpanel" aria-labelledby="tab-map" hidden>
+  <div class="map-layout">
+    <aside class="map-side">
+      <h2>Carte de la famille</h2>
+      <p class="muted small">Chaque cercle est un lieu (sa taille = nombre de personnes). Les flèches relient le lieu de naissance d'un parent à celui de son enfant : ce sont les déplacements d'une génération à l'autre.</p>
+      <fieldset class="map-options">
+        <legend>Afficher</legend>
+        <label class="check"><input type="checkbox" id="mo-births" checked> <span class="dot dot-birth"></span> Lieux de naissance</label>
+        <label class="check"><input type="checkbox" id="mo-deaths" checked> <span class="dot dot-death"></span> Lieux de décès</label>
+        <label class="check"><input type="checkbox" id="mo-gen" checked> <span class="dot dot-gen"></span> Migrations parents → enfants</label>
+        <label class="check"><input type="checkbox" id="mo-life"> <span class="dot dot-life"></span> Trajet d'une vie (naissance → décès)</label>
+        <div class="range-field"><span>Personnes nées entre</span>
+          <span class="range"><input id="mo-from" type="number" inputmode="numeric" placeholder="début" aria-label="Nés à partir de"> <input id="mo-to" type="number" inputmode="numeric" placeholder="fin" aria-label="Nés jusqu'à"></span></div>
+      </fieldset>
+      <p id="map-status" class="muted small" role="status"></p>
+      <div id="map-places" class="map-places"></div>
+      <p id="map-missing" class="muted small"></p>
+    </aside>
+    <div id="family-map" class="family-map" role="img" aria-label="Carte des lieux de la famille"></div>
+  </div>
+</section>
+
+<section id="page-stats" class="page" role="tabpanel" aria-labelledby="tab-stats" hidden>
+  <div id="stats-root" class="stats"></div>
+</section>
 
 <aside id="panel" class="panel" aria-hidden="true" aria-label="Fiche de la personne">
   <button id="panel-close" class="panel-close" aria-label="Fermer la fiche">×</button>
@@ -258,5 +290,6 @@
 <script src="tree-layout.js"></script>
 <script src="script.js"></script>
 <script src="editor.js"></script>
+<script src="extras.js"></script>
 </body>
 </html>

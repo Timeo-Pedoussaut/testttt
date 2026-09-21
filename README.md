@@ -10,6 +10,7 @@ Site statique (HTML/CSS/JS, rien à installer) hébergeable gratuitement sur Git
 | `script.js` | affichage, fiches, recherche et filtres, vues, mini-carte, thème, export PDF |
 | `tree-layout.js` | calcul de la disposition (un seul arbre, ancêtres des conjoints compris) |
 | `editor.js` | formulaire d'ajout / modification, publication des changements |
+| `extras.js` | onglets, **carte de la famille** et **statistiques** |
 | `data.js` | **les données** : personnes et familles |
 | `photos/` | les photos (`photos/nom-1.jpg`…) |
 | `tools/` | scripts pour reconstruire `data.js` depuis un export GEDCOM |
@@ -23,6 +24,9 @@ Site statique (HTML/CSS/JS, rien à installer) hébergeable gratuitement sur Git
 ## Ce que fait le site
 
 - **Un seul arbre** : les ancêtres d'un conjoint (par exemple Zélie Dacher, mère de Louis Bacquet) sont placés **au-dessus** de lui, à la même hauteur que les parents de son conjoint. Quand tu ajouteras la famille de ta mère, ses parents et grands-parents s'insèrent tout seuls au-dessus de Marie-France Hannier, sans arbre séparé.
+- **Onglets** : *Arbre*, *Carte de la famille*, *Statistiques* (adresses `#carte` et `#stats`). La recherche et les fiches marchent depuis tous les onglets.
+- **Carte de la famille** : tous les lieux de naissance (vert) et de décès (gris) sur une seule carte ; un lieu qui a les deux est en doré, et la taille du cercle = nombre de personnes. Clic sur un cercle : la liste des personnes (cliquables). Les **flèches** relient le lieu de naissance d'un parent à celui de son enfant (les déplacements d'une génération à l'autre ; plus le trait est épais, plus il y a de naissances concernées). Options : lieux de naissance / de décès, migrations parents → enfants, trajet d'une vie (naissance → décès, en pointillés), et un filtre « personnes nées entre… et… » pour voir l'évolution d'une époque à l'autre. La liste à gauche permet de zoomer sur un lieu. Les lieux qui ressemblent à une erreur de saisie (une année, une adresse) sont ignorés et signalés.
+- **Statistiques** : anniversaires du jour et des 60 prochains jours (naissances, décès, mariages), chiffres clés, âge moyen / médian au décès, plus longue vie, répartition des âges au décès, espérance de vie selon l'époque, enfants par union, âge au premier enfant et au mariage, métiers, prénoms et noms les plus fréquents, mois de naissance, lieux les plus fréquents. Un clic sur un métier, un prénom ou un lieu lance la recherche dans l'arbre. Tout est recalculé à chaque modification.
 - **Replier / déplier les branches** : chaque carte qui a des parents porte un petit bouton **−** en haut (replie ses ancêtres), et chaque union avec enfants un bouton **−** en dessous (replie la descendance). Une branche repliée devient un bouton **+N** (N = nombre de personnes masquées) ; un clic la redéplie. Le bandeau « N branches repliées » a un bouton *Tout déplier*. Les cartes glissent en douceur vers leur nouvelle place et l'état des branches repliées est mémorisé dans ton navigateur. Une personne trouvée par la recherche dans une branche repliée déplie automatiquement ce qui la cache.
 - **Carte du lieu de naissance** : dans la fiche, une petite carte OpenStreetMap (Leaflet) avec un marqueur sur le lieu de naissance. Le lieu est cherché automatiquement (service Nominatim d'OpenStreetMap, résultat mémorisé dans le navigateur). Si un lieu est introuvable ou ambigu (vieux noms, homonymes), donne ses coordonnées dans `PLACES` à la fin de `data.js` (`"Talnoe, Russie": [48.88, 30.69]`, latitude puis longitude ; clic droit sur un point de Google Maps ou d'OpenStreetMap pour les lire), ou sur une personne : `birthCoords: [lat, lon]`. Les coordonnées de Talnoé sont approximatives : à vérifier.
 - **Frise chronologique** : dans chaque fiche, la vie en ordre chronologique : naissance → mariages → naissance des enfants → décès (ou « aujourd'hui »), avec l'âge à chaque étape quand les dates le permettent. Les conjoints et enfants sont cliquables.
@@ -60,7 +64,7 @@ python3 tools/telecharger_photos.py
 
 ## Services externes utilisés par les fiches
 
-La carte charge **Leaflet** (cdnjs.cloudflare.com), les **tuiles OpenStreetMap** et interroge **Nominatim** ; elle ne s'active qu'à l'ouverture d'une fiche qui a un lieu de naissance. Le nom du lieu est alors envoyé à OpenStreetMap. Hors connexion, la fiche s'affiche sans carte.
+Les cartes (fiche et carte de la famille) chargent **Leaflet** (cdnjs.cloudflare.com), les **tuiles OpenStreetMap** et interroge **Nominatim** ; elles ne s'activent qu'à l'ouverture d'une fiche qui a un lieu de naissance ou de l'onglet *Carte*. Les noms de lieux sont alors envoyés à OpenStreetMap (une requête par seconde au plus, résultats mémorisés). Hors connexion, la fiche s'affiche sans carte.
 
 ## Vie privée et dates des personnes vivantes
 
