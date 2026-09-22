@@ -319,6 +319,54 @@
     const coords = new Map();       // lieu -> { lat, lon } | null
     const arrows = [];
     const markersByPlace = new Map();
+    let lastGenCache = new Map(), lastMaxGen = 0;   // génération de chaque personne, calculées au dernier redraw()
+    let animPlaying = false, animTimer = null;
+
+    // génération d'une personne : 0 pour un ancêtre sans parent connu, +1 à chaque génération.
+    // Les conjoints ne comptent pas une génération de plus (même logique que le reste du site).
+    function genOf(ix, cache, id) {
+      if (cache.has(id)) return cache.get(id);
+      cache.set(id, 0);              // protège d'un éventuel cycle de données
+      const pf = ix.parentFam[id];
+      let g = 0;
+      if (pf) {
+        const gh = pf.husb && ix.people[pf.husb] ? genOf(ix, cache, pf.husb) + 1 : 0;
+        const gw = pf.wife && ix.people[pf.wife] ? genOf(ix, cache, pf.wife) + 1 : 0;
+        g = Math.max(gh, gw);
+      }
+      cache.set(id, g);
+      return g;
+    }
+
+    function stopAnim() {
+      if (animTimer) { clearInterval(animTimer); animTimer = null; }
+      animPlaying = false;
+      $("anim-play").textContent = "▶";
+      $("anim-play").setAttribute("aria-pressed", "false");
+      $("anim-play").setAttribute("aria-label", "Lecture");
+    }
+    function startAnim() {
+      const slider = $("anim-slider");
+      if (+slider.value >= +slider.max) slider.value = 0;
+      animPlaying = true;
+      $("anim-play").textContent = "❚❚";
+      $("anim-play").setAttribute("aria-pressed", "true");
+      $("anim-play").setAttribute("aria-label", "Pause");
+      animTimer = setInterval(() => {
+        const s = $("anim-slider"), v = +s.value;
+        if (v >= +s.max) { stopAnim(); return; }
+        s.value = v + 1;
+        redraw();
+        updateAnimLabel();
+      }, 1300);
+    }
+    function updateAnimLabel() {
+      const v = +$("anim-slider").value;
+      const years = [];
+      lastGenCache.forEach((g, id) => { if (g === v) { const y = yr(App.getState().people[id].birth); if (y != null) years.push(y); } });
+      const range = years.length ? " · " + Math.min.apply(null, years) + (Math.max.apply(null, years) !== Math.min.apply(null, years) ? " – " + Math.max.apply(null, years) : "") : "";
+      $("anim-label").textContent = "Génération " + v + " / " + lastMaxGen + range;
+    }
 
     const setMsg = (t) => {
       let m = $("family-map").querySelector(".map-msg");
@@ -399,8 +447,21 @@
       const st = App.getState();
       const ix = TreeLayout.buildIndex(st);
       const showB = $("mo-births").checked, showD = $("mo-deaths").checked, showGen = $("mo-gen").checked, showLife = $("mo-life").checked;
+      const animOn = $("mo-anim").checked;
       const from = $("mo-from").value === "" ? null : +$("mo-from").value, to = $("mo-to").value === "" ? null : +$("mo-to").value;
-      const inRange = (p) => { if (from == null && to == null) return true; const y = yr(p.birth); return y != null && (from == null || y >= from) && (to == null || y <= to); };
+
+      const genCache = new Map();
+      Object.keys(st.people).forEach((id) => { if (!App.isUnknown(st.people[id])) genOf(ix, genCache, id); });
+      lastGenCache = genCache;
+      lastMaxGen = genCache.size ? Math.max.apply(null, Array.from(genCache.values())) : 0;
+      if (animOn) { $("anim-slider").max = String(lastMaxGen); }
+      const animGen = animOn ? +$("anim-slider").value : null;
+
+      const inRange = (id) => {
+        if (animOn) return genCache.has(id) && genCache.get(id) <= animGen;
+        if (from == null && to == null) return true;
+        const y = yr(st.people[id].birth); return y != null && (from == null || y >= from) && (to == null || y <= to);
+      };
       const cB = cssVar("--ok"), cD = cssVar("--ink-soft"), cM = cssVar("--brass"), cG = cssVar("--accent");
 
       const agg = new Map();
@@ -412,7 +473,7 @@
       const missing = new Set(), ignored = new Set();
       Object.keys(st.people).forEach((id) => {
         const p = st.people[id];
-        if (App.isUnknown(p) || !inRange(p)) return;
+        if (App.isUnknown(p) || !inRange(id)) return;
         if (p.birthPlace && badPlace(p.birthPlace) && !Array.isArray(p.birthCoords)) ignored.add(p.birthPlace);
         else if (p.birthPlace) { const c = ll(p, "birth"); if (c) add(p.birthPlace, c, id, "birth"); else if (coords.has(p.birthPlace)) missing.add(p.birthPlace); }
         if (p.deathPlace && badPlace(p.deathPlace)) ignored.add(p.deathPlace);
@@ -425,7 +486,7 @@
         st.families.forEach((f) => {
           (f.children || []).forEach((k) => {
             const kid = st.people[k];
-            if (!kid || !inRange(kid)) return;
+            if (!kid || !inRange(k)) return;
             const kc = ll(kid, "birth");
             if (!kc) return;
             [f.husb, f.wife].forEach((pid) => {
@@ -443,7 +504,7 @@
       if (showLife) {
         Object.keys(st.people).forEach((id) => {
           const p = st.people[id];
-          if (App.isUnknown(p) || !inRange(p) || !p.birthPlace || !p.deathPlace || p.birthPlace === p.deathPlace) return;
+          if (App.isUnknown(p) || !inRange(id) || !p.birthPlace || !p.deathPlace || p.birthPlace === p.deathPlace) return;
           const bc = ll(p, "birth"), dc = ll(p, "death");
           if (!bc || !dc) return;
           const key = p.birthPlace + "\\u0000" + p.deathPlace;
@@ -488,6 +549,7 @@
       if (!rows.length && !$("map-status").textContent) setMsg(Object.keys(st.people).some((i) => st.people[i].birthPlace || st.people[i].deathPlace) ? "Aucun lieu à afficher avec ces réglages." : "Aucun lieu de naissance ou de décès n'est renseigné.");
       else setMsg("");
       $("map-status").dataset.count = rows.length;
+      if (animOn) updateAnimLabel();
     }
 
     async function init() {
@@ -511,6 +573,17 @@
     }
 
     ["mo-births", "mo-deaths", "mo-gen", "mo-life", "mo-from", "mo-to"].forEach((id) => { $(id).addEventListener("input", () => redraw()); $(id).addEventListener("change", () => redraw()); });
+    $("mo-anim").addEventListener("change", () => {
+      const on = $("mo-anim").checked;
+      $("anim-controls").hidden = !on;
+      $("mo-range-field").hidden = on;
+      stopAnim();
+      if (on) { redraw(); $("anim-slider").value = 0; }   // redraw calcule d'abord le nombre de générations (met à jour anim-slider.max)
+      redraw();
+      updateAnimLabel();
+    });
+    $("anim-slider").addEventListener("input", () => { stopAnim(); redraw(); updateAnimLabel(); });
+    $("anim-play").addEventListener("click", () => { if (animPlaying) stopAnim(); else startAnim(); });
     new MutationObserver(() => { if (tab === "map") redraw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     window.addEventListener("resize", () => { if (map && tab === "map") map.invalidateSize(); });
 
@@ -520,6 +593,7 @@
         else { setTimeout(() => map && map.invalidateSize(), 60); resolveAll(); }
       },
       refresh() { if (map) resolveAll(); },
+      stop() { stopAnim(); },
     };
   })();
 

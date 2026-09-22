@@ -910,6 +910,12 @@
   // ==========================================================
   const MODE_LABEL = { desc: "Descendance de ", anc: "Ascendance de ", hour: "Ascendance et descendance de " };
 
+  (function fillDepthSelect() {
+    const sel = $("view-depth");
+    sel.appendChild(new Option("Toutes les générations", ""));
+    for (let n = 1; n <= 8; n++) sel.appendChild(new Option(n === 1 ? "1 génération" : n + " générations", String(n)));
+  })();
+
   function fillPersonSelect() {
     const sel = $("view-person");
     const mode = $("view-mode").value;
@@ -931,16 +937,21 @@
   function syncViewControls() {
     $("view-mode").value = view.mode;
     $("view-person-wrap").hidden = view.mode === "all";
+    $("view-depth-wrap").hidden = view.mode === "all";
     if (view.mode !== "all") { fillPersonSelect(); $("view-person").value = view.pid; }
+    $("view-depth").value = view.depth ? String(view.depth) : "";
   }
 
   function setView(v, opts) {
-    view = v.mode === "all" ? { mode: "all", pid: null } : { mode: v.mode, pid: v.pid };
+    view = v.mode === "all" ? { mode: "all", pid: null, depth: null } : { mode: v.mode, pid: v.pid, depth: v.depth || null };
     syncViewControls();
     render();
     initialView();
     if (!opts || !opts.keepHash) {
-      try { history.replaceState(null, "", view.mode === "all" ? location.pathname + location.search : "#vue=" + view.mode + ":" + view.pid); } catch (e) { /* file:// */ }
+      try {
+        history.replaceState(null, "", view.mode === "all" ? location.pathname + location.search
+          : "#vue=" + view.mode + ":" + view.pid + (view.depth ? ":" + view.depth : ""));
+      } catch (e) { /* file:// */ }
     }
   }
 
@@ -948,12 +959,14 @@
     const mode = e.target.value;
     if (mode === "all") { setView({ mode: "all" }); return; }
     $("view-person-wrap").hidden = false;
+    $("view-depth-wrap").hidden = false;
     fillPersonSelect();
     const sel = $("view-person");
     if (!sel.value && sel.options.length) sel.value = sel.options[0].value;
-    setView({ mode, pid: sel.value });
+    setView({ mode, pid: sel.value, depth: view.depth });
   });
-  $("view-person").addEventListener("change", (e) => setView({ mode: $("view-mode").value, pid: e.target.value }));
+  $("view-person").addEventListener("change", (e) => setView({ mode: $("view-mode").value, pid: e.target.value, depth: view.depth }));
+  $("view-depth").addEventListener("change", (e) => setView({ mode: $("view-mode").value, pid: $("view-person").value, depth: e.target.value ? +e.target.value : null }));
 
   // ==========================================================
   // 8. Recherche avancée + filtres
@@ -1091,7 +1104,8 @@
   }
 
   function viewLabel() {
-    return view.mode === "all" ? "Tout l'arbre" : MODE_LABEL[view.mode] + displayName(state.people[view.pid]);
+    if (view.mode === "all") return "Tout l'arbre";
+    return MODE_LABEL[view.mode] + displayName(state.people[view.pid]) + (view.depth ? " (" + view.depth + (view.depth > 1 ? " générations" : " génération") + ")" : "");
   }
 
   function preparePrint(paper, orient, withTitle) {
@@ -1170,9 +1184,9 @@
     syncDensityBtn();
     $("btn-minimap").setAttribute("aria-pressed", String(prefs.minimap));
     const h = location.hash;
-    let m = /#vue=(desc|anc|hour):([^&]+)/.exec(h);
-    if (m && state.people[decodeURIComponent(m[2])]) view = { mode: m[1], pid: decodeURIComponent(m[2]) };
-    else if ((m = /#branche=([^&]+)/.exec(h)) && state.people[decodeURIComponent(m[1])]) view = { mode: "desc", pid: decodeURIComponent(m[1]) };
+    let m = /#vue=(desc|anc|hour):([^&:]+)(?::(\d+))?/.exec(h);
+    if (m && state.people[decodeURIComponent(m[2])]) view = { mode: m[1], pid: decodeURIComponent(m[2]), depth: m[3] ? +m[3] : null };
+    else if ((m = /#branche=([^&]+)/.exec(h)) && state.people[decodeURIComponent(m[1])]) view = { mode: "desc", pid: decodeURIComponent(m[1]), depth: null };
     fillPersonSelect();
     syncViewControls();
     render();
