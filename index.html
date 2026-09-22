@@ -214,8 +214,10 @@
         <label class="span2">Métier(s) <input id="pf-job" type="text"></label>
         <label class="span2">Anecdote <textarea id="pf-anecdote" rows="4"></textarea></label>
         <div class="span2 photo-field">
-          <div id="pf-photo-preview" class="photo-preview" aria-hidden="true"></div>
-          <label>Photo principale <input id="pf-photo" type="file" accept="image/*"></label>
+          <span class="lbl">Photos</span>
+          <div id="pf-photo-gallery" class="photo-gallery"></div>
+          <label class="photo-add-label">+ Ajouter une ou plusieurs photos <input id="pf-photo" type="file" accept="image/*" multiple></label>
+          <p class="muted small">La 1ʳᵉ photo de la liste est le portrait principal (cartes et fiche). Utilisez ★ pour en choisir une autre, ⟳ pour pivoter une photo de travers, × pour la retirer.</p>
         </div>
       </div>
     </fieldset>
