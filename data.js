@@ -22,7 +22,9 @@ const PEOPLE = {
   "louis_bacquet": {"given": "Louis", "surname": "Bacquet", "sex": "H", "birth": "30 juin 1900", "dead": true, "death": "1992"},
   "jeanne_marie_charlotte_clavaud_de_lucon": {"given": "Jeanne Marie Charlotte", "surname": "Clavaud de Luçon", "sex": "F", "birth": "31 mars 1905", "dead": true, "death": "13 octobre 1993", "deathPlace": "Canteleu"},
   "marie_charlotte_levasseur": {"given": "Marie Charlotte", "surname": "Levasseur", "marriedName": "Clavaud de Luçon", "sex": "F", "birth": "21 avril 1884", "birthPlace": "Bois-Guillaume", "dead": true, "death": "1970", "note": "Décès vers 1970 (non répertorié au fichier informatisé INSEE débutant le 01/01/1970)", "photo": "photos/marie_charlotte_levasseur-1.jpg", "photos": ["photos/marie_charlotte_levasseur-1.jpg", "photos/marie_charlotte_levasseur-2.jpg"]},
-  "andre_clavaud_de_lucon": {"given": "André", "surname": "Clavaud de Luçon", "sex": "H", "birth": "vers 15 mars 1840", "birthPlace": "Talnoe, Russie", "dead": true, "death": "1913", "deathPlace": "Elbeuf", "deathCause": "Maladie", "job": "Soldat à la 1re compagnie de pionniers de discipline", "anecdote": "En 1848 il a eu un acte de notoriété qu'il a dû faire quand il est rentré en France à 18ans", "photo": "photos/andre_clavaud_de_lucon-1.jpg", "photos": ["photos/andre_clavaud_de_lucon-1.jpg", "photos/andre_clavaud_de_lucon-2.jpg"]},
+  "andre_clavaud_de_lucon": {"given": "Georges André Gustave", "surname": "Clavaud de Luçon", "sex": "H", "birth": "vers 15 mars 1840", "birthPlace": "Talnoe, Russie", "dead": true, "death": "1913", "deathPlace": "Elbeuf", "deathCause": "Maladie", "job": "Comptable, Soldat à la 1re compagnie de pionniers de discipline", "anecdote": "En 1848 il a eu un acte de notoriété qu'il a dû faire quand il est rentré en France à 18ans", "photo": "photos/andre_clavaud_de_lucon-1.jpg", "photos": ["photos/andre_clavaud_de_lucon-1.jpg", "photos/andre_clavaud_de_lucon-2.jpg"]},
+  "elisa_rose_gendre": {"given": "Elisa Rose", "surname": "Gendre", "sex": "F", "birth": "1848", "dead": true},
+  "marie_josephine_elisa_clavaud": {"given": "Marie Joséphine Elisa", "surname": "Clavaud", "sex": "F", "birth": "janvier 1865", "birthPlace": "Paris 18e", "dead": true, "death": "10 octobre 1865", "deathPlace": "Paris 18e", "note": "Décédée à l'âge de 9 mois"},
   "zelie_dacher": {"given": "Zelie", "surname": "Dacher", "sex": "F", "dead": true, "deathPlace": "1970"},
   "inconnu_500011": {"given": "", "surname": "", "sex": "H"},
   "mailyne_pedoussaut": {"given": "Mailyne", "surname": "Pedoussaut", "sex": "F", "birth": "2 janvier 2001", "birthPlace": "Rouen"},
@@ -36,7 +38,7 @@ const PEOPLE = {
   "odette_louise_andree_clavaud_de_lucon": {"given": "Odette Louise Andrée", "surname": "Clavaud de Luçon", "sex": "F", "birth": "12 septembre 1907", "dead": true, "death": "1993", "deathPlace": "Rouen"},
   "georgette_suzanne_marie_clavaud_de_lucon": {"given": "Georgette Suzanne Marie", "surname": "Clavaud de Luçon", "sex": "F", "birth": "15 octobre 1909", "dead": true},
   "valentin_bidault": {"given": "Valentin", "surname": "Bidault", "sex": "H", "dead": true},
-  "marie_josephine_clavaud_de_lucon": {"given": "Marie Joséphine", "surname": "Clavaud de Luçon", "sex": "F", "birth": "15 octobre 1911", "dead": true},
+  "marie_josephine_clavaud_de_lucon": {"given": "Marie Joséphine", "surname": "Clavaud de Luçon", "sex": "F", "birth": "15 octobre 1911", "birthPlace": "Elbeuf", "dead": true},
   "henri_clavaud_de_lucon": {"given": "Henri", "surname": "Clavaud de Luçon", "sex": "H"},
   "inconnu_500025": {"given": "", "surname": "", "sex": "F"},
   "nicole_clavaud_de_lucon": {"given": "Nicole", "surname": "Clavaud de Luçon", "sex": "F"},
@@ -80,5 +82,6 @@ const FAMILIES = [
   {"id": "F500014", "husb": "charles_serge_andre_clavaud_de_lucon", "wife": "inconnu_500039", "children": ["serge_george_andre_clavaud_de_lucon"]},
   {"id": "F500015", "husb": "charles_serge_andre_clavaud_de_lucon", "wife": "marie_julie_josephine_lethiec", "children": ["hugues_jean_jacques_lucien_clavaud"], "married": true},
   {"id": "F500016", "husb": "camille_jules_deleurme", "wife": "marie_josephine_lea_clavaud", "children": ["andre_auguste_gaston_deleurme", "jeanne_lea_marie_deleurme"]},
-  {"id": "F500017", "husb": "yves_maurice_clavaud_de_lucon", "wife": "elisabeth_renee_cave", "children": ["guy_clavaud_de_lucon"]}
+  {"id": "F500017", "husb": "yves_maurice_clavaud_de_lucon", "wife": "elisabeth_renee_cave", "children": ["guy_clavaud_de_lucon"]},
+  {"id": "F500018", "husb": "andre_clavaud_de_lucon", "wife": "elisa_rose_gendre", "children": ["marie_josephine_elisa_clavaud"]}
 ];
