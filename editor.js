@@ -123,7 +123,7 @@
     });
   }
 
-  // Fait pivoter une image (chemin publié ou photo tout juste ajoutée) d'un quart de tour.
+  // Fait pivoter une image d'un quart de tour (photo publiée ou tout juste ajoutée)
   function rotateImageSrc(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -137,28 +137,25 @@
         ctx.translate(c.width / 2, c.height / 2);
         ctx.rotate(Math.PI / 2);
         ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
-        try { resolve(c.toDataURL("image/jpeg", 0.9)); }
-        catch (e) { reject(e); } // canvas "entaché" (image d'un autre site) : très rare ici
+        try { resolve(c.toDataURL("image/jpeg", 0.9)); } catch (e) { reject(e); }
       };
       img.src = src;
     });
   }
 
-  // Galerie de photos du formulaire : photoDraft[0] est toujours la photo principale.
+  // Galerie du formulaire : photoDraft[0] est la photo principale
   function renderGallery() {
     const box = $("pf-photo-gallery");
     box.textContent = "";
     if (!photoDraft.length) {
       const p = document.createElement("p");
-      p.className = "photo-empty";
-      p.textContent = "Aucune photo pour l'instant.";
+      p.className = "photo-empty"; p.textContent = "Aucune photo pour l'instant.";
       box.appendChild(p);
       return;
     }
     photoDraft.forEach((src, i) => {
       const item = document.createElement("div");
       item.className = "photo-item" + (i === 0 ? " is-main" : "");
-
       const img = document.createElement("img");
       img.alt = ""; img.src = src;
       img.addEventListener("error", () => { img.replaceWith(document.createTextNode("?")); });
@@ -166,38 +163,24 @@
 
       const actions = document.createElement("div");
       actions.className = "photo-actions";
-
-      const star = document.createElement("button");
-      star.type = "button";
-      star.className = "p-star" + (i === 0 ? " active" : "");
-      star.textContent = "★";
-      star.title = i === 0 ? "Photo principale" : "Définir comme photo principale";
-      star.addEventListener("click", () => {
+      const btn = (cls, txt, title, fn) => {
+        const b = document.createElement("button");
+        b.type = "button"; b.className = cls; b.textContent = txt; b.title = title;
+        b.addEventListener("click", (ev) => { ev.preventDefault(); ev.stopPropagation(); fn(b); });
+        actions.appendChild(b);
+      };
+      btn("p-star" + (i === 0 ? " active" : ""), "★", i === 0 ? "Photo principale" : "Définir comme photo principale", () => {
         if (i === 0) return;
-        const [x] = photoDraft.splice(i, 1);
+        const x = photoDraft.splice(i, 1)[0];
         photoDraft.unshift(x);
         renderGallery();
       });
-      actions.appendChild(star);
-
-      const rot = document.createElement("button");
-      rot.type = "button";
-      rot.textContent = "⟳";
-      rot.title = "Faire pivoter (90°)";
-      rot.addEventListener("click", async () => {
-        rot.disabled = true;
+      btn("p-rot", "⟳", "Faire pivoter (90°)", async (b) => {
+        b.disabled = true;
         try { photoDraft[i] = await rotateImageSrc(photoDraft[i]); renderGallery(); }
-        catch (e) { showError("Cette photo n'a pas pu être pivotée."); rot.disabled = false; }
+        catch (e) { showError("Cette photo n'a pas pu être pivotée."); b.disabled = false; }
       });
-      actions.appendChild(rot);
-
-      const del = document.createElement("button");
-      del.type = "button";
-      del.textContent = "×";
-      del.title = "Retirer cette photo";
-      del.addEventListener("click", () => { photoDraft.splice(i, 1); renderGallery(); });
-      actions.appendChild(del);
-
+      btn("p-del", "×", "Retirer cette photo", () => { photoDraft.splice(i, 1); renderGallery(); });
       item.appendChild(actions);
       box.appendChild(item);
     });
@@ -356,13 +339,8 @@
       else if (val) target[k] = val;
       else delete target[k];
     });
-    if (photoDraft.length) {
-      target.photo = photoDraft[0];
-      target.photos = photoDraft.slice();
-    } else {
-      delete target.photo;
-      delete target.photos;
-    }
+    if (photoDraft.length) { target.photo = photoDraft[0]; target.photos = photoDraft.slice(); }
+    else { delete target.photo; delete target.photos; }
   }
 
   function pushUnique(list, v) { if (list.indexOf(v) < 0) list.push(v); }
