@@ -13,7 +13,7 @@
   const CFG = App.config;
   const dlg = $("dlg-person"), form = $("person-form");
 
-  let mode = "add", editId = null, pendingPhoto = null;
+  let mode = "add", editId = null, photoDraft = [];
 
   // ==========================================================
   // Outils
@@ -123,28 +123,96 @@
     });
   }
 
-  function setPreview(src, p) {
-    const box = $("pf-photo-preview");
+  // Fait pivoter une image (chemin publié ou photo tout juste ajoutée) d'un quart de tour.
+  function rotateImageSrc(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onerror = () => reject(new Error("image illisible"));
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = img.naturalHeight; c.height = img.naturalWidth;
+        const ctx = c.getContext("2d");
+        ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+        ctx.translate(c.width / 2, c.height / 2);
+        ctx.rotate(Math.PI / 2);
+        ctx.drawImage(img, -img.naturalWidth / 2, -img.naturalHeight / 2);
+        try { resolve(c.toDataURL("image/jpeg", 0.9)); }
+        catch (e) { reject(e); } // canvas "entaché" (image d'un autre site) : très rare ici
+      };
+      img.src = src;
+    });
+  }
+
+  // Galerie de photos du formulaire : photoDraft[0] est toujours la photo principale.
+  function renderGallery() {
+    const box = $("pf-photo-gallery");
     box.textContent = "";
-    if (src) {
+    if (!photoDraft.length) {
+      const p = document.createElement("p");
+      p.className = "photo-empty";
+      p.textContent = "Aucune photo pour l'instant.";
+      box.appendChild(p);
+      return;
+    }
+    photoDraft.forEach((src, i) => {
+      const item = document.createElement("div");
+      item.className = "photo-item" + (i === 0 ? " is-main" : "");
+
       const img = document.createElement("img");
       img.alt = ""; img.src = src;
-      img.addEventListener("error", () => { box.textContent = p ? (p.given || "?").charAt(0).toUpperCase() : "?"; });
-      box.appendChild(img);
-    } else box.textContent = "?";
+      img.addEventListener("error", () => { img.replaceWith(document.createTextNode("?")); });
+      item.appendChild(img);
+
+      const actions = document.createElement("div");
+      actions.className = "photo-actions";
+
+      const star = document.createElement("button");
+      star.type = "button";
+      star.className = "p-star" + (i === 0 ? " active" : "");
+      star.textContent = "★";
+      star.title = i === 0 ? "Photo principale" : "Définir comme photo principale";
+      star.addEventListener("click", () => {
+        if (i === 0) return;
+        const [x] = photoDraft.splice(i, 1);
+        photoDraft.unshift(x);
+        renderGallery();
+      });
+      actions.appendChild(star);
+
+      const rot = document.createElement("button");
+      rot.type = "button";
+      rot.textContent = "⟳";
+      rot.title = "Faire pivoter (90°)";
+      rot.addEventListener("click", async () => {
+        rot.disabled = true;
+        try { photoDraft[i] = await rotateImageSrc(photoDraft[i]); renderGallery(); }
+        catch (e) { showError("Cette photo n'a pas pu être pivotée."); rot.disabled = false; }
+      });
+      actions.appendChild(rot);
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.textContent = "×";
+      del.title = "Retirer cette photo";
+      del.addEventListener("click", () => { photoDraft.splice(i, 1); renderGallery(); });
+      actions.appendChild(del);
+
+      item.appendChild(actions);
+      box.appendChild(item);
+    });
   }
 
   $("pf-photo").addEventListener("change", async (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-    try {
-      pendingPhoto = await resizeImage(f, 720);
-      setPreview(pendingPhoto);
-      showError("");
-    } catch (err) {
-      pendingPhoto = null;
-      showError("Cette photo n'a pas pu être lue. Essayez un fichier JPEG ou PNG.");
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    showError("");
+    for (const f of files) {
+      try { photoDraft.push(await resizeImage(f, 720)); }
+      catch (err) { showError("Une photo n'a pas pu être lue. Essayez un fichier JPEG ou PNG."); }
     }
+    renderGallery();
+    e.target.value = "";
   });
 
   // ==========================================================
@@ -216,7 +284,6 @@
     const st = App.getState();
     mode = opts.mode === "edit" && st.people[opts.id] ? "edit" : "add";
     editId = mode === "edit" ? opts.id : null;
-    pendingPhoto = null;
     form.reset();
     showError("");
     $("pf-photo").value = "";
@@ -238,7 +305,8 @@
     $("pf-deathcause").value = p.deathCause || "";
     $("pf-job").value = p.job || "";
     $("pf-anecdote").value = p.anecdote || "";
-    setPreview(p.photo || "", p);
+    photoDraft = (p.photos && p.photos.length) ? p.photos.slice() : (p.photo ? [p.photo] : []);
+    renderGallery();
 
     if (mode === "add") {
       fillTargets(st);
@@ -288,10 +356,12 @@
       else if (val) target[k] = val;
       else delete target[k];
     });
-    if (pendingPhoto) {
-      const old = target.photos || (target.photo ? [target.photo] : []);
-      target.photo = pendingPhoto;
-      target.photos = [pendingPhoto].concat(old.filter((x) => x !== pendingPhoto));
+    if (photoDraft.length) {
+      target.photo = photoDraft[0];
+      target.photos = photoDraft.slice();
+    } else {
+      delete target.photo;
+      delete target.photos;
     }
   }
 

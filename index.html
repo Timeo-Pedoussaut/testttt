@@ -60,7 +60,17 @@
         <option value="hour">Ascendance et descendance de…</option>
       </select></label>
     <label id="view-person-wrap" hidden><span class="sr">Personne</span><select id="view-person"></select></label>
-    <label id="view-depth-wrap" hidden><span class="sr">Nombre de générations</span><select id="view-depth"></select></label>
+    <label id="view-gen-wrap" hidden><span class="sr">Générations</span>
+      <select id="view-gen">
+        <option value="">Toutes les générations</option>
+        <option value="1">1 génération</option>
+        <option value="2">2 générations</option>
+        <option value="3">3 générations</option>
+        <option value="4">4 générations</option>
+        <option value="5">5 générations</option>
+        <option value="6">6 générations</option>
+        <option value="8">8 générations</option>
+      </select></label>
   </div>
 
   <div class="tb-zoom" role="group" aria-label="Zoom">
@@ -131,25 +141,43 @@
         <label class="check"><input type="checkbox" id="mo-deaths" checked> <span class="dot dot-death"></span> Lieux de décès</label>
         <label class="check"><input type="checkbox" id="mo-gen" checked> <span class="dot dot-gen"></span> Migrations parents → enfants</label>
         <label class="check"><input type="checkbox" id="mo-life"> <span class="dot dot-life"></span> Trajet d'une vie (naissance → décès)</label>
-        <div id="mo-range-field" class="range-field"><span>Personnes nées entre</span>
+        <div class="range-field"><span>Personnes nées entre</span>
           <span class="range"><input id="mo-from" type="number" inputmode="numeric" placeholder="début" aria-label="Nés à partir de"> <input id="mo-to" type="number" inputmode="numeric" placeholder="fin" aria-label="Nés jusqu'à"></span></div>
       </fieldset>
-      <fieldset class="map-options">
-        <legend>Animation dans le temps</legend>
-        <label class="check"><input type="checkbox" id="mo-anim"> Faire apparaître génération par génération</label>
+      <fieldset class="map-options map-anim">
+        <legend>Chronologie animée</legend>
+        <label class="check"><input type="checkbox" id="mo-anim"> Faire apparaître les naissances et les déplacements au fil du temps</label>
         <div id="anim-controls" class="anim-controls" hidden>
           <div class="anim-row">
             <button type="button" id="anim-play" class="icon-btn" aria-label="Lecture">▶</button>
-            <input type="range" id="anim-slider" min="0" max="0" value="0" step="1" aria-label="Génération affichée">
+            <input type="range" id="anim-year" min="1800" max="2026" value="1800" step="1" aria-label="Année">
+            <output id="anim-year-out" for="anim-year">1800</output>
           </div>
-          <p id="anim-label" class="muted small" role="status"></p>
+          <div class="anim-row">
+            <label>Vitesse
+              <select id="anim-speed">
+                <option value="700">Lente</option>
+                <option value="350" selected>Normale</option>
+                <option value="120">Rapide</option>
+              </select></label>
+            <label>Pas
+              <select id="anim-step">
+                <option value="1">1 an</option>
+                <option value="5">5 ans</option>
+                <option value="25" selected>25 ans (génération)</option>
+              </select></label>
+          </div>
+          <p class="muted small">Les personnes apparaissent à leur année de naissance ; les flèches, quand l'enfant est né.</p>
         </div>
       </fieldset>
       <p id="map-status" class="muted small" role="status"></p>
       <div id="map-places" class="map-places"></div>
       <p id="map-missing" class="muted small"></p>
     </aside>
-    <div id="family-map" class="family-map" role="img" aria-label="Carte des lieux de la famille"></div>
+    <div class="family-map-wrap">
+      <div id="family-map" class="family-map" role="img" aria-label="Carte des lieux de la famille"></div>
+      <div id="map-year-badge" class="map-year-badge" hidden aria-hidden="true"></div>
+    </div>
   </div>
 </section>
 
@@ -226,8 +254,10 @@
         <label class="span2">Métier(s) <input id="pf-job" type="text"></label>
         <label class="span2">Anecdote <textarea id="pf-anecdote" rows="4"></textarea></label>
         <div class="span2 photo-field">
-          <div id="pf-photo-preview" class="photo-preview" aria-hidden="true"></div>
-          <label>Photo principale <input id="pf-photo" type="file" accept="image/*"></label>
+          <span class="lbl">Photos</span>
+          <div id="pf-photo-gallery" class="photo-gallery"></div>
+          <label class="photo-add-label">+ Ajouter une ou plusieurs photos <input id="pf-photo" type="file" accept="image/*" multiple></label>
+          <p class="muted small">La 1ʳᵉ photo de la liste est le portrait principal (cartes et fiche). Utilisez ★ pour en choisir une autre, ⟳ pour pivoter une photo de travers, × pour la retirer.</p>
         </div>
       </div>
     </fieldset>

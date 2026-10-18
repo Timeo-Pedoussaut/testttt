@@ -21,9 +21,10 @@
     cardW: 232, cardH: 104, linkW: 24,
     hGap: 34,       // espace horizontal minimal entre deux blocs d'une même ligne
     vGap: 72,       // espace vertical entre deux générations
-    busStep: 16,    // décalage des traits quand un bloc a plusieurs unions avec enfants
+    busStep: 9,     // décalage des traits quand un bloc a plusieurs unions avec enfants
     margin: 40,
     iterations: 40,
+    crossingPasses: 8, // passes de réduction des croisements de traits (barycentre)
     marriageText: null, // (famille) => texte à afficher près de l'union, ou ""
     collapsible: false, // ajoute les boutons replier / déplier
     hidden: null,       // { down: Map(idFamille -> nb masqués), up: Map(idPersonne -> nb masqués) }
@@ -87,42 +88,69 @@
   }
 
   // ------------------------------------------------------------------ sous-ensembles (vues)
-  // maxGen limite le nombre de générations parcourues (null/undefined = toutes). Les
-  // conjoints d'une génération ne comptent pas comme une génération de plus.
-  function descendantsSet(idx, pid, maxGen) {
+  function descendantsSet(idx, pid) {
     const set = new Set([pid]), seen = new Set();
-    (function down(id, g) {
+    (function down(id) {
       if (seen.has(id)) return;
       seen.add(id);
       (idx.famsOf[id] || []).forEach((f) => {
         [f.husb, f.wife].forEach((s) => { if (s && idx.people[s]) set.add(s); });
-        if (maxGen != null && g >= maxGen) return;
-        (f.children || []).forEach((c) => { if (idx.people[c]) { set.add(c); down(c, g + 1); } });
+        (f.children || []).forEach((c) => { if (idx.people[c]) { set.add(c); down(c); } });
       });
-    })(pid, 0);
+    })(pid);
     return set;
   }
 
-  function ancestorsSet(idx, pid, maxGen) {
+  function ancestorsSet(idx, pid) {
     const set = new Set([pid]);
-    (function up(id, g) {
-      if (maxGen != null && g >= maxGen) return;
+    (function up(id) {
       const f = idx.parentFam[id];
       if (!f) return;
-      [f.husb, f.wife].forEach((p) => { if (p && idx.people[p] && !set.has(p)) { set.add(p); up(p, g + 1); } });
-    })(pid, 0);
+      [f.husb, f.wife].forEach((p) => { if (p && idx.people[p] && !set.has(p)) { set.add(p); up(p); } });
+    })(pid);
     return set;
   }
 
-  // view = { mode: "all" | "desc" | "anc" | "hour", pid, depth }
-  // depth limite le nombre de générations affichées à partir de pid (null = toutes).
+  // Mêmes parcours, limités à « gen » générations (réglage « nombre de générations »)
+  function descendantsSetLimited(idx, pid, gen) {
+    const set = new Set([pid]);
+    let frontier = [pid];
+    for (let g = 0; g < gen && frontier.length; g++) {
+      const next = [];
+      frontier.forEach((id) => (idx.famsOf[id] || []).forEach((f) => {
+        [f.husb, f.wife].forEach((s) => { if (s && idx.people[s]) set.add(s); });
+        (f.children || []).forEach((c) => { if (idx.people[c] && !set.has(c)) { set.add(c); next.push(c); } });
+      }));
+      frontier = next;
+    }
+    return set;
+  }
+
+  function ancestorsSetLimited(idx, pid, gen) {
+    const set = new Set([pid]);
+    let frontier = [pid];
+    for (let g = 0; g < gen && frontier.length; g++) {
+      const next = [];
+      frontier.forEach((id) => {
+        const f = idx.parentFam[id];
+        if (!f) return;
+        [f.husb, f.wife].forEach((p) => { if (p && idx.people[p] && !set.has(p)) { set.add(p); next.push(p); } });
+      });
+      frontier = next;
+    }
+    return set;
+  }
+
+  // view = { mode: "all" | "desc" | "anc" | "hour", pid, gen }  (gen : nb de générations, vide = toutes)
   function viewSet(idx, view) {
     if (!view || view.mode === "all" || !idx.people[view.pid]) return new Set(idx.order);
-    const d = view.depth || null;
-    if (view.mode === "desc") return descendantsSet(idx, view.pid, d);
-    if (view.mode === "anc") return ancestorsSet(idx, view.pid, d);
-    const a = ancestorsSet(idx, view.pid, d);
-    descendantsSet(idx, view.pid, d).forEach((x) => a.add(x));
+    const gen = view.gen > 0 ? view.gen : null;
+    const down = () => (gen ? descendantsSetLimited(idx, view.pid, gen) : descendantsSet(idx, view.pid));
+    const up = () => (gen ? ancestorsSetLimited(idx, view.pid, gen) : ancestorsSet(idx, view.pid));
+    if (view.mode === "desc") return down();
+    if (view.mode === "anc") return up();
+    const a = up();
+    down().forEach((x) => a.add(x));
     return a;
   }
 
@@ -197,6 +225,32 @@
     const set = new Set();
     baseSet.forEach((x) => { if (!remove.has(x)) set.add(x); });
     return { set, hidden };
+  }
+
+  // ------------------------------------------------------------------ réduction des croisements
+  function rowIndexMap(row) { const m = new Map(); row.forEach((b, i) => m.set(b, i)); return m; }
+
+  // Heuristique de Sugiyama : on alterne des passes descendantes / montantes ; un bloc sans
+  // voisin dans la ligne de référence garde sa place relative.
+  function reduceCrossings(lists, maxGen, incoming, outgoing, iterations) {
+    const sweep = (g, ref, key, pick) => {
+      const refIdx = rowIndexMap(lists[ref]);
+      const scored = lists[g].map((b, i) => {
+        const ls = (key.get(b) || []).filter((l) => refIdx.has(l[pick]));
+        return { b, k: ls.length ? avg(ls.map((l) => refIdx.get(l[pick]))) : i };
+      });
+      scored.sort((a, c) => a.k - c.k);
+      const next = scored.map((s) => s.b);
+      const moved = next.some((b, i) => b !== lists[g][i]);
+      lists[g] = next;
+      return moved;
+    };
+    for (let it = 0; it < iterations; it++) {
+      let moved = false;
+      for (let g = 1; g <= maxGen; g++) moved = sweep(g, g - 1, incoming, "pb") || moved;
+      for (let g = maxGen - 1; g >= 0; g--) moved = sweep(g, g + 1, outgoing, "cb") || moved;
+      if (!moved) break;
+    }
   }
 
   // ------------------------------------------------------------------ régression isotone (positions sans chevauchement)
@@ -311,6 +365,12 @@
       const cb = blockOf[k];
       links.push({ fi, pb: b, cb, off: cb.cards.indexOf(k) * step + o.cardW / 2 });
     })));
+    const incoming = new Map(), outgoing = new Map();
+    links.forEach((l) => {
+      if (l.cb === l.pb) return;
+      (incoming.get(l.cb) || incoming.set(l.cb, []).get(l.cb)).push(l);
+      (outgoing.get(l.pb) || outgoing.set(l.pb, []).get(l.pb)).push(l);
+    });
 
     // --- générations : au plus tôt, puis les ancêtres sont rapprochés de leurs enfants
     const cap = blocks.length + 5;
@@ -361,36 +421,9 @@
       });
     })();
 
-    const incoming = new Map(), outgoing = new Map();
-    links.forEach((l) => {
-      if (l.cb === l.pb) return;
-      (incoming.get(l.cb) || incoming.set(l.cb, []).get(l.cb)).push(l);
-      (outgoing.get(l.pb) || outgoing.set(l.pb, []).get(l.pb)).push(l);
-    });
-
-    // --- réduction des croisements de traits (méthode du barycentre)
-    // Le parcours ci-dessus donne un ordre correct dans le cas simple, mais dès qu'une
-    // personne ET son ou sa conjoint(e) ont chacun des parents connus (ex. les deux côtés
-    // d'un couple ont leur ascendance affichée), deux branches sans lien entre elles peuvent
-    // se retrouver entremêlées sur une même ligne et leurs traits se croisent. On affine
-    // l'ordre en alternant : ordonner chaque ligne selon la position moyenne de ses parents
-    // (passage vers le bas), puis selon celle de ses enfants (passage vers le haut).
-    function barycenterSweep(down) {
-      const range = down ? [1, maxGen, 1] : [maxGen - 1, 0, -1];
-      for (let g = range[0]; down ? g <= range[1] : g >= range[1]; g += range[2]) {
-        const row = lists[g];
-        const refIndex = new Map();
-        lists[g + (down ? -1 : 1)].forEach((b, i) => refIndex.set(b, i));
-        const rank = new Map();
-        row.forEach((b, i) => {
-          const neigh = (down ? incoming.get(b) : outgoing.get(b)) || [];
-          const idxs = neigh.map((l) => refIndex.get(down ? l.pb : l.cb)).filter((x) => x != null);
-          rank.set(b, idxs.length ? avg(idxs) : i);
-        });
-        row.sort((a, b) => rank.get(a) - rank.get(b));
-      }
-    }
-    for (let pass = 0; pass < 2; pass++) { barycenterSweep(true); barycenterSweep(false); }
+    // --- réduction des croisements : chaque ligne est réordonnée selon la position moyenne
+    // (barycentre) de ses parents / enfants dans la ligne voisine
+    reduceCrossings(lists, maxGen, incoming, outgoing, o.crossingPasses);
 
     // --- positions horizontales
     lists.forEach((row) => { let x = 0; row.forEach((b) => { b.x = x; x += b.w + o.hGap; }); });
@@ -476,5 +509,5 @@
     return out;
   }
 
-  return { DEFAULTS, yearOf, buildIndex, layoutGraph, layoutView, viewSet, applyCollapse, descendantsSet, ancestorsSet, hasKids, countDesc, sortedFams, sortedKids };
+  return { DEFAULTS, yearOf, buildIndex, layoutGraph, layoutView, viewSet, applyCollapse, descendantsSet, ancestorsSet, descendantsSetLimited, ancestorsSetLimited, hasKids, countDesc, sortedFams, sortedKids };
 });
