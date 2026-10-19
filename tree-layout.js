@@ -377,21 +377,53 @@
     // se retrouver entremêlées sur une même ligne et leurs traits se croisent. On affine
     // l'ordre en alternant : ordonner chaque ligne selon la position moyenne de ses parents
     // (passage vers le bas), puis selon celle de ses enfants (passage vers le haut).
+    // Les enfants d'une même famille (fratrie) forment une « unité » qui reste d'un seul tenant :
+    // on ne déplace que des unités entières (puis, à l'intérieur, les blocs). Sans cela, la fratrie
+    // d'une personne se retrouvait éparpillée, entrecoupée d'autres familles, et ses traits très longs.
+    const placeRanked = (items, ranks) => {
+      const slots = [];
+      ranks.forEach((r, i) => { if (r != null) slots.push(i); });
+      const sorted = slots.map((i) => ({ it: items[i], r: ranks[i], i })).sort((a, c) => a.r - c.r || a.i - c.i);
+      slots.forEach((slot, n) => { items[slot] = sorted[n].it; });
+    };
+    function rowUnits(g) {
+      const row = lists[g], par = new Map();
+      row.forEach((b) => par.set(b, b));
+      const root = (b) => { while (par.get(b) !== b) { par.set(b, par.get(par.get(b))); b = par.get(b); } return b; };
+      fams.forEach((fi) => {
+        const kb = fi.kids.map((k) => blockOf[k]).filter((x) => x.gen === g);
+        for (let i = 1; i < kb.length; i++) par.set(root(kb[i]), root(kb[0]));
+      });
+      const units = [], byRoot = new Map();
+      row.forEach((b) => {
+        const r = root(b);
+        if (!byRoot.has(r)) { const u = { blocks: [], rank: null }; byRoot.set(r, u); units.push(u); }
+        byRoot.get(r).blocks.push(b);
+      });
+      return units;
+    }
     function barycenterSweep(down) {
       const range = down ? [1, maxGen, 1] : [maxGen - 1, 0, -1];
       for (let g = range[0]; down ? g <= range[1] : g >= range[1]; g += range[2]) {
-        const row = lists[g];
         const refIndex = new Map();
         lists[g + (down ? -1 : 1)].forEach((b, i) => refIndex.set(b, i));
-        const rank = new Map();
-        row.forEach((b, i) => {
+        const rankOf = (b) => {
           const neigh = (down ? incoming.get(b) : outgoing.get(b)) || [];
           const idxs = neigh.map((l) => refIndex.get(down ? l.pb : l.cb)).filter((x) => x != null);
-          rank.set(b, idxs.length ? avg(idxs) : i);
+          return idxs.length ? avg(idxs) : null;
+        };
+        const units = rowUnits(g);
+        units.forEach((u) => {
+          const ranks = u.blocks.map(rankOf);
+          placeRanked(u.blocks, ranks);
+          const known = ranks.filter((x) => x != null);
+          u.rank = known.length ? avg(known) : null;
         });
-        row.sort((a, b) => rank.get(a) - rank.get(b));
+        placeRanked(units, units.map((u) => u.rank));
+        lists[g] = [].concat.apply([], units.map((u) => u.blocks));
       }
     }
+
     // Un bloc « personne + plusieurs conjoints » : on range les conjoints dans le même ordre que
     // leurs enfants sur la ligne du dessous, sinon les traits des deux unions se croisent
     // (ex. le conjoint de gauche a ses enfants à droite et inversement).
@@ -424,7 +456,7 @@
       });
       return changed;
     }
-    for (let pass = 0; pass < 3; pass++) { barycenterSweep(true); barycenterSweep(false); orderSpouses(); }
+    for (let pass = 0; pass < 4; pass++) { barycenterSweep(true); barycenterSweep(false); orderSpouses(); }
 
     // --- positions horizontales
     lists.forEach((row) => { let x = 0; row.forEach((b) => { b.x = x; x += b.w + o.hGap; }); });
@@ -440,6 +472,27 @@
     }
     const minX = blocks.reduce((m, b) => Math.min(m, b.x), Infinity);
     blocks.forEach((b) => { b.x += o.margin - minX; });
+
+    // --- positions figées : quand des branches sont repliées, chaque personne encore visible garde
+    // EXACTEMENT sa place dans la disposition « tout déplié » (rien ne bouge quand on replie ou déplie)
+    if (o.pin) {
+      const rowH = o.cardH + o.vGap;
+      blocks.forEach((b) => {
+        const hubId = b.cards[b.hub];
+        b.cards.sort((a, c) => o.pin.x.get(a) - o.pin.x.get(c));
+        b.hub = b.cards.indexOf(hubId);
+        b.gen = Math.round((o.pin.y.get(b.cards[0]) - o.margin) / rowH);
+        b.x = avg(b.cards.map((id, i) => o.pin.x.get(id) - i * step));
+        setAnchors(b);
+      });
+      links.forEach((l) => { l.off = l.cb.cards.indexOf(l.k) * step + o.cardW / 2; });
+      const rows = {};
+      blocks.forEach((b) => { (rows[b.gen] = rows[b.gen] || []).push(b); });
+      Object.keys(rows).forEach((g) => {
+        const row = rows[g].sort((a, c) => a.x - c.x);
+        spread(row, row.map((b) => b.x), o.hGap); // sécurité : ne bouge que s'il y avait un chevauchement
+      });
+    }
 
     // --- sortie
     const rowY = (g) => o.margin + g * (o.cardH + o.vGap);
@@ -556,6 +609,7 @@
     });
     out.width = maxX + o.margin;
     out.height = rowY(maxGen) + o.cardH + o.margin;
+    if (o.pin) { out.width = Math.max(out.width, o.pin.width); out.height = Math.max(out.height, o.pin.height); }
     return out;
   }
 
@@ -564,7 +618,15 @@
   function layoutView(idx, view, opts) {
     const base = viewSet(idx, view);
     const c = applyCollapse(idx, base, opts && opts.collapse);
-    const out = layoutGraph(idx, c.set, Object.assign({}, opts, { hidden: c.hidden, collapsible: true }));
+    let pin = null;
+    if (c.set.size < base.size) {
+      // des branches sont repliées : on calcule d'abord la disposition « tout déplié » et on
+      // y fige les positions, pour que replier / déplier ne déplace personne
+      const ref = layoutGraph(idx, base, Object.assign({}, opts, { hidden: { down: new Map(), up: new Map() }, collapsible: true }));
+      pin = { x: new Map(), y: new Map(), width: ref.width, height: ref.height };
+      ref.cards.forEach((k) => { pin.x.set(k.id, k.x); pin.y.set(k.id, k.y); });
+    }
+    const out = layoutGraph(idx, c.set, Object.assign({}, opts, { hidden: c.hidden, collapsible: true, pin }));
     out.hiddenCount = c.hidden.down.size + c.hidden.up.size;
     return out;
   }
